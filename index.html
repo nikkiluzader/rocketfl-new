@@ -19,6 +19,14 @@
         </div>
     </nav>
     <div id="map"></div>
+    <div id="launch-modal" style="display:none; position: fixed; z-index: 1000; left: 50%; top: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px;">
+        <button onclick="closeModal()" style="position: absolute; top: 10px; right: 10px; cursor: pointer;">X</button>
+        <div id="modal-content">
+            <!-- Modal content will be dynamically inserted here -->
+        </div>
+    </div>
+    
+    
     <script src="./script.js"></script>
 </body>
 

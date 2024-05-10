@@ -1,38 +1,45 @@
+let map, globalLocation;
 
+const pads = {
+    "TBD": "",
+    "SLC-41":[28.583333, -80.583056],
+    "LC-39A":[28.608389, -80.604333]
+}
 
 function fetchRocketLaunchData() {
-    const key = "f0c3ad60-b756-4f6b-8ce3-8c9201d2537a";
-    const apiUrl = "https://fdo.rocketlaunch.live/json/launches";
-    const params = {
-        "after_date": formatDate(new Date()),
-        "state_abbr": "FL",
-        "limit": 10
-    };
-    const queryString = Object.keys(params).map(function (key) {
-        return encodeURIComponent(key) + "=" + encodeURIComponent(params[key]);
-    }).join("&");
+    return new Promise((resolve, reject) => {
+        const key = "f0c3ad60-b756-4f6b-8ce3-8c9201d2537a";
+        const apiUrl = "https://fdo.rocketlaunch.live/json/launches";
+        const params = {
+            "after_date": formatDate(new Date()),
+            "state_abbr": "FL",
+            "limit": 10
+        };
+        const queryString = Object.keys(params).map(function (key) {
+            return encodeURIComponent(key) + "=" + encodeURIComponent(params[key]);
+        }).join("&");
 
-    const fullUrl = apiUrl + "?" + queryString;
+        const fullUrl = apiUrl + "?" + queryString;
 
-    const options = {
-        "method": "get",
-        "headers": {
-            "Authorization": `Bearer ${key}`
-        }
-    };
-    try {
+        const options = {
+            "method": "get",
+            "headers": {
+                "Authorization": `Bearer ${key}`
+            }
+        };
         fetch(fullUrl, options)
             .then(response => response.json())
             .then(data => {
-                results = data.result
-                results.forEach(r => {
-                    const element = generateListElement(r)
-                    addElementToList(element)
-                })
+                const results = data.result;
+                console.log(results)
+                const elements = results.map(r => addElementToList(r));
+                resolve(elements);
             })
-    } catch (e) {
-        console.log("Error fetching data: " + e);
-    }
+            .catch(e => {
+                console.log("Error fetching data: " + e);
+                reject(e);
+            });
+    });
 }
 
 
@@ -89,13 +96,64 @@ function extractLaunchData(data) {
 
 }
 
-function generateListElement(result) {
 
+function openModal(launch) {
+    const modalContent = `
+        <h1>${launch.name}</h1>
+        <p><strong>Launch Date:</strong> ${launch.t0 ? new Date(launch.t0).toLocaleString() : 'TBD'}</p>
+        <p><strong>Provider:</strong> ${launch.provider.name}</p>
+        <p><strong>Vehicle:</strong> ${launch.vehicle.name}</p>
+        <p><strong>Location:</strong> ${launch.pad.name}, ${launch.pad.location.name}</p>
+        <p><strong>Mission Description:</strong> ${launch.missions[0] && launch.missions[0].description ? launch.missions[0].description : 'No description available.'}</p>
+        <p><strong>More Info:</strong> <a href="https://rocketlaunch.live/launch/${launch.slug}" target="_blank">Click here</a></p>
+    `;
+
+    // Inserting modal content into the modal content div
+    const modalElement = document.getElementById('modal-content');
+    modalElement.innerHTML = modalContent;
+
+    // Display the entire modal
+    document.getElementById('launch-modal').style.display = 'block';
 }
 
-function addElementToList(element) {
 
+function closeModal() {
+    const modalElement = document.getElementById('launch-modal');
+    modalElement.style.display = 'none'; // Hide the modal
 }
+
+
+function updateMap(location) {
+    const lat = parseFloat(location.latitude); // Make sure your data includes latitude
+    const long = parseFloat(location.longitude); // Make sure your data includes longitude
+
+    map.flyTo({
+        center: [55, 35],
+        essential: true // this animation is considered essential with respect to prefers-reduced-motion
+    });
+}
+
+
+function addElementToList(launch) {
+    const container = document.getElementById('upcoming-launches');
+
+    const launchCard = document.createElement('div');
+    launchCard.className = 'launch-card';
+    launchCard.onclick = () => updateMap(launch.pad.location);
+    launchCard.ondblclick = () => openModal(launch);
+
+    // Create HTML content for the launch card
+    const content = `
+        <h4>${launch.name} - ${launch.date_str}</h4>
+        <p>Provider: ${launch.provider.name}</p>
+        <p>Vehicle: ${launch.vehicle.name}</p>
+        <p>Pad: ${launch.pad.name}, ${launch.pad.location.name}</p>
+    `;
+
+    launchCard.innerHTML = content;
+    container.appendChild(launchCard);
+}
+
 
 function addMap(userLocation) {
 
@@ -105,7 +163,7 @@ function addMap(userLocation) {
 
 
     mapboxgl.accessToken = 'pk.eyJ1IjoibmlrbHV6IiwiYSI6ImNrZjF0ZDZ5aTFha3MzMG1ic3BvN3hxdXkifQ.Cj_SS8daXsIijQjJZYdk4Q';
-    const map = new mapboxgl.Map({
+    map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/streets-v9',
         projection: 'mercator', // Display the map as a globe, since satellite-v9 defaults to Mercator
@@ -122,6 +180,7 @@ function addMap(userLocation) {
 
 
 }
+
 
 function getUserLocation() {
     return new Promise((resolve, reject) => {
@@ -141,25 +200,31 @@ function getUserLocation() {
     });
 }
 
-function nav(){
+
+function updateNav(){
     document.getElementById('nav-toggle').addEventListener('click', function() {
         document.querySelector('nav').classList.toggle('nav-visible');
     });
 }
 
 
-
 function main() {
 
-    fetchRocketLaunchData()
+    updateNav()
+
+    fetchRocketLaunchData().then(elements => {
+        elements.forEach(e => addElementToList(e));
+    }).catch(error => {
+        console.error("Failed to fetch rocket launch data: ", error);
+    });
 
     getUserLocation().then(userLocation => {
+        globalLocation = userLocation
         addMap(userLocation);
     }).catch(error => {
         console.error(error);
     });
 
-    nav()
 
 }
 
