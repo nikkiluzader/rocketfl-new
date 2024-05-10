@@ -156,30 +156,124 @@ function addElementToList(launch) {
 
 
 function addMap(userLocation) {
-
-    console.warn(userLocation) // is an Array here [lat, long]
-
-    console.log(userLocation[0]) // how is this undefined then??
-
+    console.warn(userLocation);
 
     mapboxgl.accessToken = 'pk.eyJ1IjoibmlrbHV6IiwiYSI6ImNrZjF0ZDZ5aTFha3MzMG1ic3BvN3hxdXkifQ.Cj_SS8daXsIijQjJZYdk4Q';
     map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/streets-v9',
-        projection: 'mercator', // Display the map as a globe, since satellite-v9 defaults to Mercator
+        projection: 'mercator',
         zoom: 6,
         center: [-81.760254, 27.994402]
     });
 
     if (userLocation) {
-        const popup = new mapboxgl.Popup({ closeOnClick: false })
-            .setLngLat([userLocation[1], userLocation[0]])
-            .setHTML('<p>You</p>')
+        const userLngLat = [userLocation[1], userLocation[0]];
+        const launchLngLat = [-80.583056, 28.583333]; // Assuming this is the fixed launch location
+
+        // Add user location marker
+        new mapboxgl.Marker()
+            .setLngLat(userLngLat)
             .addTo(map);
+
+        // Add launch location marker
+        new mapboxgl.Marker({ color: 'red' })
+            .setLngLat(launchLngLat)
+            .addTo(map);
+
+        // Draw a line from user location to launch location
+        map.on('load', function () {
+            map.addSource('line', {
+                type: 'geojson',
+                data: {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: [userLngLat, launchLngLat]
+                    }
+                }
+            });
+
+            map.addLayer({
+                id: 'line',
+                type: 'line',
+                source: 'line',
+                layout: {
+                    'line-cap': 'round',
+                    'line-join': 'round'
+                },
+                paint: {
+                    'line-color': 'red',
+                    'line-width': 5
+                }
+            });
+
+            // Calculate bearing and convert to compass direction
+            const bearing = calculateBearing(userLocation[1], userLocation[0], -80.583056, 28.583333);
+            const compassDirection = bearingToCompass(bearing);
+            const midpoint = calculateMidpoint(userLocation[1], userLocation[0], -80.583056, 28.583333);
+
+            // Add a popup at the midpoint
+            new mapboxgl.Popup()
+                .setLngLat(midpoint)
+                .setHTML(`${bearing.toFixed(2)} degrees ${compassDirection}`)
+                .addTo(map);
+        });
     }
-
-
 }
+
+
+
+function calculateMidpoint(lat1, lng1, lat2, lng2) {
+    const dLng = degreesToRadians(lng2 - lng1);
+    lat1 = degreesToRadians(lat1);
+    lat2 = degreesToRadians(lat2);
+    lng1 = degreesToRadians(lng1);
+
+    const bx = Math.cos(lat2) * Math.cos(dLng);
+    const by = Math.cos(lat2) * Math.sin(dLng);
+    const lat3 = Math.atan2(Math.sin(lat1) + Math.sin(lat2),
+                            Math.sqrt((Math.cos(lat1) + bx) * (Math.cos(lat1) + bx) + by * by));
+    const lng3 = lng1 + Math.atan2(by, Math.cos(lat1) + bx);
+
+    return [radiansToDegrees(lat3), radiansToDegrees(lng3)];
+}
+
+
+
+function calculateBearing(startLat, startLng, destLat, destLng) {
+    let lon1 = degreesToRadians(startLng);
+    let lon2 = degreesToRadians(destLng);
+    let lat1 = degreesToRadians(startLat);
+    let lat2 = degreesToRadians(destLat);
+
+    let dLon = lon2 - lon1;
+    let x = Math.sin(dLon) * Math.cos(lat2);
+    let y = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    let bearing = radiansToDegrees(Math.atan2(x, y));
+    bearing = (bearing + 360) % 360; // Normalize
+    
+    let oppositeBearing = (bearing + 180) % 360;
+
+    return oppositeBearing; // Return the opposite bearing normalized
+}
+
+function degreesToRadians(degrees) {
+    return degrees * Math.PI / 180;
+}
+
+function radiansToDegrees(radians) {
+    return radians * 180 / Math.PI;
+}
+
+function bearingToCompass(bearing) {
+    const sectors = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+    bearing = (bearing + 360) % 360; // Normalize
+    let sectorIndex = Math.floor(bearing / 22.5 + 0.5); // Calculate sector index
+    return sectors[sectorIndex % 16]; // Return the corresponding sector
+}
+
 
 
 function getUserLocation() {
