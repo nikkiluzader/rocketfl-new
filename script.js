@@ -141,6 +141,12 @@ function getUserLocation() {
     });
 }
 
+function nav(){
+    document.getElementById('nav-toggle').addEventListener('click', function() {
+        document.querySelector('nav').classList.toggle('nav-visible');
+    });
+}
+
 
 
 function main() {
@@ -152,6 +158,8 @@ function main() {
     }).catch(error => {
         console.error(error);
     });
+
+    nav()
 
 }
 
