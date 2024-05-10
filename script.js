@@ -1,10 +1,11 @@
-let map, globalLocation;
+let map, globalLocation, userMarker, launchMarker, directionalLine, bearingPopUp;
 
 const pads = {
     "TBD": "",
-    "SLC-41":[28.583333, -80.583056],
-    "LC-39A":[28.608389, -80.604333]
+    "SLC-41":[-80.583056, 28.583333],
+    "LC-39A":[-80.604333, 28.608389]
 }
+
 
 function fetchRocketLaunchData() {
     return new Promise((resolve, reject) => {
@@ -123,13 +124,75 @@ function closeModal() {
 }
 
 
-function updateMap(location) {
-    const lat = parseFloat(location.latitude); // Make sure your data includes latitude
-    const long = parseFloat(location.longitude); // Make sure your data includes longitude
+function updateMap(padName) {
+    let coords;
+    if(padName == "Pad TBD"){
+        coords = pads["TBD"]
+    }else{
+        coords = pads[padName]
+    }
 
-    map.flyTo({
-        center: [-80.583056, 28.583333],
-        essential: true // this animation is considered essential with respect to prefers-reduced-motion
+    const popupElement = document.querySelector('.mapboxgl-popup');
+    if (popupElement) {
+        popupElement.addEventListener('click', () => {
+            bearingPopUp.remove();
+        });
+    }
+    launchMarker.remove()
+    map.removeLayer("line")
+    map.removeSource("line")
+
+
+    // Add launch location marker
+    launchMarker = new mapboxgl.Marker({ color: 'red', class: "launch-marker"})
+        .setLngLat(coords)
+        .addTo(map);
+
+    map.addSource('line', {
+        type: 'geojson',
+        data: {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+                type: 'LineString',
+                coordinates: globalLocation
+            }
+        }
+    });
+
+    map.addLayer({
+        id: 'line',
+        type: 'line',
+        source: 'line',
+        layout: {
+            'line-cap': 'round',
+            'line-join': 'round'
+        },
+        paint: {
+            'line-color': 'red',
+            'line-width': 3
+        }
+    });
+
+    // Calculate bearing and convert to compass direction
+    const bearing = calculateBearing(globalLocation[1], globalLocation[0], -80.583056, 28.583333);
+    const compassDirection = bearingToCompass(bearing);
+    const midpoint = calculateMidpoint(globalLocation[1], globalLocation[0], -80.583056, 28.583333);
+
+    // Add a popup at the midpoint
+    bearingPopUp = new mapboxgl.Popup()
+        .setLngLat(midpoint)
+        .setHTML(`${bearing.toFixed(2)}° ${compassDirection}`)
+        .addTo(map);
+
+    // Close the popup when it's clicked
+    bearingPopUp.on('open', () => {
+        const popupElement = document.querySelector('.mapboxgl-popup');
+        if (popupElement) {
+            popupElement.addEventListener('click', () => {
+                popup.remove();
+            });
+        }
     });
 }
 
@@ -139,7 +202,13 @@ function addElementToList(launch) {
 
     const launchCard = document.createElement('div');
     launchCard.className = 'launch-card';
-    launchCard.onclick = () => updateMap(launch.pad.location);
+    // launchCard.onclick = () => updateMap(launch.pad.location); // not working. need to store launch data in global variable
+    launchCard.onclick = () => {
+        const padRegex = /Pad: ([^,]+),/;
+        const match = launchCard.innerHTML.match(padRegex);
+        const padName = match ? match[1] : 'Pad name not found';
+        updateMap(padName)
+    };
     launchCard.ondblclick = () => openModal(launch);
 
     // Create HTML content for the launch card
@@ -172,12 +241,12 @@ function addMap(userLocation) {
         const launchLngLat = [-80.583056, 28.583333]; // Assuming this is the fixed launch location
 
         // Add user location marker
-        new mapboxgl.Marker()
+        userMarker = new mapboxgl.Marker()
             .setLngLat(userLngLat)
             .addTo(map);
 
         // Add launch location marker
-        new mapboxgl.Marker({ color: 'red' })
+        launchMarker = new mapboxgl.Marker({ color: 'red', class: "launch-marker"})
             .setLngLat(launchLngLat)
             .addTo(map);
 
@@ -205,7 +274,7 @@ function addMap(userLocation) {
                 },
                 paint: {
                     'line-color': 'red',
-                    'line-width': 5
+                    'line-width': 3
                 }
             });
 
@@ -215,14 +284,23 @@ function addMap(userLocation) {
             const midpoint = calculateMidpoint(userLocation[1], userLocation[0], -80.583056, 28.583333);
 
             // Add a popup at the midpoint
-            new mapboxgl.Popup()
+            bearingPopUp = new mapboxgl.Popup()
                 .setLngLat(midpoint)
-                .setHTML(`${bearing.toFixed(2)} degrees ${compassDirection}`)
+                .setHTML(`${bearing.toFixed(2)}° ${compassDirection}`)
                 .addTo(map);
+
+            // Close the popup when it's clicked
+            bearingPopUp.on('open', () => {
+                const popupElement = document.querySelector('.mapboxgl-popup');
+                if (popupElement) {
+                    popupElement.addEventListener('click', () => {
+                        popup.remove();
+                    });
+                }
+            });
         });
     }
 }
-
 
 
 function calculateMidpoint(lat1, lng1, lat2, lng2) {
@@ -239,7 +317,6 @@ function calculateMidpoint(lat1, lng1, lat2, lng2) {
 
     return [radiansToDegrees(lat3), radiansToDegrees(lng3)];
 }
-
 
 
 function calculateBearing(startLat, startLng, destLat, destLng) {
@@ -259,13 +336,16 @@ function calculateBearing(startLat, startLng, destLat, destLng) {
     return oppositeBearing; // Return the opposite bearing normalized
 }
 
+
 function degreesToRadians(degrees) {
     return degrees * Math.PI / 180;
 }
 
+
 function radiansToDegrees(radians) {
     return radians * 180 / Math.PI;
 }
+
 
 function bearingToCompass(bearing) {
     const sectors = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -273,7 +353,6 @@ function bearingToCompass(bearing) {
     let sectorIndex = Math.floor(bearing / 22.5 + 0.5); // Calculate sector index
     return sectors[sectorIndex % 16]; // Return the corresponding sector
 }
-
 
 
 function getUserLocation() {
@@ -321,5 +400,6 @@ function main() {
 
 
 }
+
 
 main()

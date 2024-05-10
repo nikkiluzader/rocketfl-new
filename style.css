@@ -87,3 +87,17 @@ nav {
 #launch-modal button:hover {
     color: #999;
 }
+
+
+.mapboxgl-popup-content {
+    background-color: black !important; /* Ensure the background is black */
+    color: #00ff00; /* Set text color to green */
+    font-family: 'Courier New', Courier, monospace; /* Gives it a more 'terminal-like' font */
+    font-size: 12px;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.mapboxgl-popup-tip {
+    display: none; /* Hides the default tip of the popup */
+}
