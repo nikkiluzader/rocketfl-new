@@ -128,7 +128,7 @@ function updateMap(location) {
     const long = parseFloat(location.longitude); // Make sure your data includes longitude
 
     map.flyTo({
-        center: [55, 35],
+        center: [-80.583056, 28.583333],
         essential: true // this animation is considered essential with respect to prefers-reduced-motion
     });
 }
