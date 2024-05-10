@@ -22,14 +22,14 @@ function fetchRocketLaunchData() {
     };
     try {
         fetch(fullUrl, options)
-        .then(response => response.json())
-        .then(data => {
-            results = data.result
-            results.forEach(r => {
-                const element = generateListElement(r)
-                addElementToList(element)
+            .then(response => response.json())
+            .then(data => {
+                results = data.result
+                results.forEach(r => {
+                    const element = generateListElement(r)
+                    addElementToList(element)
+                })
             })
-        })
     } catch (e) {
         console.log("Error fetching data: " + e);
     }
@@ -54,7 +54,7 @@ function convertToLocaleDateTime(isoString) {
     const date = new Date(isoString);
 
     const year = date.getFullYear();
-    let month = date.getMonth() + 1; 
+    let month = date.getMonth() + 1;
     let day = date.getDate();
     let hours = date.getHours();
     let minutes = date.getMinutes();
@@ -89,17 +89,70 @@ function extractLaunchData(data) {
 
 }
 
-function generateListElement(result){
+function generateListElement(result) {
 
 }
 
-function addElementToList(element){
-    
+function addElementToList(element) {
+
+}
+
+function addMap(userLocation) {
+
+    console.warn(userLocation) // is an Array here [lat, long]
+
+    console.log(userLocation[0]) // how is this undefined then??
+
+
+    mapboxgl.accessToken = 'pk.eyJ1IjoibmlrbHV6IiwiYSI6ImNrZjF0ZDZ5aTFha3MzMG1ic3BvN3hxdXkifQ.Cj_SS8daXsIijQjJZYdk4Q';
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v9',
+        projection: 'mercator', // Display the map as a globe, since satellite-v9 defaults to Mercator
+        zoom: 6,
+        center: [-81.760254, 27.994402]
+    });
+
+    if (userLocation) {
+        const popup = new mapboxgl.Popup({ closeOnClick: false })
+            .setLngLat([userLocation[1], userLocation[0]])
+            .setHTML('<p>You</p>')
+            .addTo(map);
+    }
+
+
+}
+
+function getUserLocation() {
+    return new Promise((resolve, reject) => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                console.log("Latitude: " + position.coords.latitude);
+                console.log("Longitude: " + position.coords.longitude);
+                resolve([position.coords.latitude, position.coords.longitude]);
+            }, function (error) {
+                console.log("The user denied location access.");
+                reject(error);
+            });
+        } else {
+            console.log("Geolocation is not supported by this browser.");
+            reject(new Error("Geolocation is not supported by this browser."));
+        }
+    });
 }
 
 
-function main(){
+
+function main() {
+
     fetchRocketLaunchData()
+
+    getUserLocation().then(userLocation => {
+        addMap(userLocation);
+    }).catch(error => {
+        console.error(error);
+    });
+
 }
 
 main()
